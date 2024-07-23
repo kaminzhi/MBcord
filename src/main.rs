@@ -3,31 +3,50 @@ mod handlers;
 mod services;
 
 use dotenv::dotenv;
-use serenity::framework::standard::StandardFramework;
-use serenity::Client;
+use serenity::async_trait;
+use serenity::framework::standard::macros::group;
+use serenity::framework::StandardFramework;
+use serenity::prelude::*;
 use songbird::SerenityInit;
 use std::env;
 
-use crate::commands::MUSIC_GROUP;
+use crate::commands::{join::*, leave::*, play::*};
 use crate::handlers::Handler;
+
+#[group]
+#[commands(join, leave, play)]
+struct Music;
 
 #[tokio::main]
 async fn main() {
+    // 加載 .env 文件中的環境變量
     dotenv().ok();
 
-    let token = env::var("DISCORD_TOKEN").expect("Discord token not set");
+    // 設置日誌
+    env_logger::init();
+
+    // 從環境變量獲取 Discord token
+    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+
+    // 設置命令框架
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!"))
+        .configure(|c| c.prefix("!").allow_dm(false).case_insensitivity(true))
         .group(&MUSIC_GROUP);
 
-    let mut client = Client::builder(token)
-        .event_handler(Handler)
+    // 創建事件處理器
+    let handler = Handler::new();
+
+    // 構建客戶端
+    let mut client = Client::builder(&token)
+        .event_handler(handler)
         .framework(framework)
         .register_songbird()
         .await
-        .expect("Error creating client");
+        .expect("Err creating client");
 
+    // 啟動客戶端
     if let Err(why) = client.start().await {
-        println!("An error occurred while running the client: {:?}", why);
+        println!("Client error: {:?}", why);
     }
 }
+
